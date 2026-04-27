@@ -1,0 +1,190 @@
+/* =========================
+   LOGIN PAGE (ISOLATED)
+========================= */
+
+.login-page {
+  height: 100vh;
+  display: flex;
+
+  background: radial-gradient(circle at left, #0f172a, #070b14);
+  overflow: hidden;
+
+  font-family: "Inter", sans-serif;
+}
+
+/* =========================
+   LEFT PANEL (SCOPED)
+========================= */
+
+.login-page .left-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  text-align: center;
+  color: white;
+  padding: 40px;
+
+  /* AI glow background */
+  background: radial-gradient(
+    circle at center,
+    rgba(0,198,255,0.06),
+    transparent
+  );
+}
+
+/* TITLE */
+.login-page .left-panel h1 {
+  font-size: 48px;
+  margin: 0;
+
+  background: linear-gradient(90deg, #00c6ff, #7c3aed);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* DESCRIPTION */
+.login-page .left-panel p {
+  margin-top: 10px;
+  color: #9ca3af;
+  max-width: 320px;
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+/* =========================
+   3D EMOJI (LOGIN ONLY)
+========================= */
+
+.login-page .emoji-3d {
+  font-size: 85px;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  margin-bottom: 20px;
+
+  filter: drop-shadow(0 0 25px #00c6ff);
+
+  animation: floatEmoji 3s ease-in-out infinite;
+}
+
+@keyframes floatEmoji {
+  0% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-8px) scale(1.05); }
+  100% { transform: translateY(0px) scale(1); }
+}
+
+/* =========================
+   LOGIN CARD (SCOPED)
+========================= */
+
+.login-page .login-card {
+  width: 360px;
+  padding: 35px;
+
+  margin: auto 100px auto auto;
+
+  background: rgba(17, 24, 39, 0.75);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+
+  backdrop-filter: blur(14px);
+
+  box-shadow:
+    0 25px 70px rgba(0,0,0,0.6),
+    0 0 20px rgba(0,198,255,0.12);
+
+  animation: float 5s ease-in-out infinite;
+}
+
+/* FLOAT ANIMATION */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+  100% { transform: translateY(0px); }
+}
+
+/* ICON */
+.login-page .icon {
+  font-size: 30px;
+  margin-bottom: 10px;
+}
+
+/* HEADINGS */
+.login-page h2 {
+  color: white;
+  margin: 0;
+}
+
+.login-page .sub {
+  color: #9ca3af;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+/* =========================
+   INPUTS (SCOPED)
+========================= */
+
+.login-page input {
+  width: 100%;
+  padding: 12px;
+  margin: 8px 0;
+
+  border-radius: 10px;
+  border: 1px solid #374151;
+
+  background: #0b1220;
+  color: white;
+
+  outline: none;
+  transition: 0.3s;
+}
+
+.login-page input:focus {
+  border-color: #00c6ff;
+  box-shadow: 0 0 10px rgba(0,198,255,0.25);
+}
+
+/* =========================
+   BUTTONS (SCOPED)
+========================= */
+
+.login-page button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 15px;
+
+  border: none;
+  border-radius: 10px;
+
+  background: linear-gradient(90deg, #00c6ff, #7c3aed);
+  color: white;
+  font-weight: bold;
+
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.login-page button:hover {
+  transform: scale(1.02);
+}
+
+/* =========================
+   FOOTER
+========================= */
+
+.login-page .footer {
+  margin-top: 15px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.login-page .footer span {
+  color: #00c6ff;
+  cursor: pointer;
+}

@@ -1,0 +1,95 @@
+body {
+  margin: 0;
+  font-family: "Segoe UI", sans-serif;
+
+  /* 🔥 deeper AI gradient */
+  background: radial-gradient(circle at top left, #0f2027, #070b14);
+  background-size: 400% 400%;
+  animation: gradientBG 12s ease infinite;
+
+  color: white;
+}
+
+/* BACKGROUND ANIMATION */
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* CENTER CONTAINER */
+.container {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* MAIN CARD (AI GLASS STYLE UPGRADE) */
+.card {
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(25px);
+
+  border-radius: 20px;
+  padding: 30px;
+  width: 420px;
+
+  text-align: center;
+
+  box-shadow:
+    0 10px 40px rgba(0,0,0,0.6),
+    0 0 20px rgba(0,198,255,0.15);
+
+  border: 1px solid rgba(255,255,255,0.15);
+
+  animation: fadeIn 0.8s ease;
+}
+
+/* ENTRY ANIMATION */
+@keyframes fadeIn {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* BUTTONS (AI STYLE) */
+button {
+  padding: 12px 18px;
+  border: none;
+  border-radius: 10px;
+
+  background: linear-gradient(90deg, #00c6ff, #7c3aed);
+  color: white;
+
+  cursor: pointer;
+  margin: 5px;
+
+  transition: 0.3s;
+  font-weight: bold;
+}
+
+button:hover {
+  transform: scale(1.06);
+  box-shadow: 0 0 15px rgba(0,198,255,0.4);
+}
+
+/* CAMERA */
+video, canvas {
+  border-radius: 12px;
+  margin-top: 10px;
+
+  box-shadow: 0 0 15px rgba(0,198,255,0.2);
+}
+
+/* OPTIONAL: AI LABEL FEEL (if you use emotion text) */
+.label {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #00c6ff;
+  font-weight: bold;
+}
