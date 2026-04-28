@@ -1,21 +1,35 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Download, TrendingUp, TrendingDown, Calendar, Award, Target } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
-import { getWeeklyReportData } from "../utils/emotionStorage";
+import { getWeeklyReportData, getTomorrowMoodPrediction } from "../utils/emotionStorage";
+import { ensureWeeklyReportReadyNotification } from "../utils/notificationStorage";
 import "./WeeklyReports.css";
 
 const WeeklyReports = () => {
   const [weeklyData, setWeeklyData] = useState(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-  const reportRef = useRef();
 
   useEffect(() => {
+    const getWeekKey = () => {
+      const now = new Date();
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+      const weekStart = new Date(now.setDate(diff));
+      return weekStart.toISOString().slice(0, 10);
+    };
+
     const loadWeeklyReport = () => {
       const report = getWeeklyReportData();
       setWeeklyData(report);
+      if (report.totalEntries > 0) {
+        ensureWeeklyReportReadyNotification(
+          localStorage.getItem("loggedUser") || "guest",
+          getWeekKey(),
+          `Your weekly emotion report is ready for ${new Date().toLocaleDateString()}.`
+        );
+      }
     };
 
     loadWeeklyReport();
@@ -35,38 +49,294 @@ const WeeklyReports = () => {
     };
   }, []);
 
-  const generatePDF = async () => {
+  const generatePDF = () => {
+    if (!weeklyData) return;
     setIsGeneratingPDF(true);
+
     try {
-      const canvas = await html2canvas(reportRef.current, {
-        backgroundColor: '#0b1220',
-        scale: 2,
+      const username = localStorage.getItem("loggedUser") || "Guest";
+      const generatedDate = new Date().toLocaleDateString();
+      const prediction = getTomorrowMoodPrediction();
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const margin = 18;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const usableWidth = pageWidth - margin * 2;
+      let y = 20;
+
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, pageWidth, pageHeight, "F");
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(18);
+      pdf.text("Emotion AI Weekly Report", margin, y);
+
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "normal");
+      y += 8;
+      pdf.text(`Username: ${username}`, margin, y);
+      pdf.text(`Generated: ${generatedDate}`, pageWidth - margin, y, { align: "right" });
+
+      y += 10;
+      pdf.setDrawColor(220);
+      pdf.setLineWidth(0.2);
+      pdf.line(margin, y, pageWidth - margin, y);
+      y += 10;
+
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Summary", margin, y);
+      y += 8;
+
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "normal");
+      const summaryRows = [
+        `Best mood day: ${weeklyData.bestDay.day}`,
+        `Most frequent emotion: ${weeklyData.mostFrequentEmotion.emotion} (${weeklyData.mostFrequentEmotion.percentage}%)`,
+        `Weekly average mood: ${weeklyData.weeklyAverageMood}%`,
+        `Success rate: ${weeklyData.successRate}%`,
+        `Total captures: ${weeklyData.totalEntries}`,
+      ];
+
+      summaryRows.forEach((row) => {
+        if (y > pageHeight - 60) {
+          pdf.addPage();
+          y = 20;
+        }
+        pdf.text(`• ${row}`, margin, y);
+        y += 7;
       });
 
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
+      const days = Array.isArray(weeklyData.dailyBreakdown) ? weeklyData.dailyBreakdown.slice(0, 7) : [];
+      const hasChartData = days.some((day) => day.totalCount > 0);
 
-      const imgWidth = 210;
-      const pageHeight = 295;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
+      y += 10;
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Daily Mood Breakdown", margin, y);
+      y += 8;
 
-      let position = 0;
+      if (hasChartData) {
+        const chartHeight = 70;
+        const chartX = margin;
+        const chartY = y;
+        const chartBottom = chartY + chartHeight;
+        const chartLeft = chartX + 24;
+        const chartRight = pageWidth - margin;
+        const chartInnerWidth = chartRight - chartLeft;
+        const chartInnerHeight = chartHeight - 24;
 
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+        pdf.setDrawColor(220);
+        pdf.rect(chartX, chartY, usableWidth, chartHeight);
 
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+        // Draw Y-axis labels
+        pdf.setFontSize(7);
+        pdf.setTextColor(107, 114, 128);
+        [100, 50, 0].forEach((value, index) => {
+          const labelY = chartY + 10 + (chartInnerHeight / 2) * index;
+          pdf.text(`${value}%`, chartLeft - 6, labelY + 2, { align: "right" });
+          pdf.line(chartLeft, labelY, chartRight, labelY, "S");
+        });
+
+        const groupWidth = chartInnerWidth / Math.max(days.length, 1);
+        const barWidth = Math.min(8, groupWidth * 0.22);
+        const series = [
+          { key: "happiness", color: [34, 197, 94], label: "Happiness" },
+          { key: "stress", color: [239, 68, 68], label: "Stress" },
+          { key: "productivity", color: [59, 130, 246], label: "Productivity" },
+        ];
+
+        days.forEach((day, index) => {
+          const groupX = chartLeft + index * groupWidth;
+          series.forEach((serie, serieIndex) => {
+            const value = Math.max(0, Math.min(100, day[serie.key] || 0));
+            const barHeight = (value / 100) * chartInnerHeight;
+            const barX = groupX + serieIndex * (barWidth + 2);
+            const barY = chartBottom - 10 - barHeight;
+
+            pdf.setFillColor(...serie.color);
+            pdf.rect(barX, barY, barWidth, barHeight, "F");
+            pdf.setFontSize(7);
+            pdf.setTextColor(17, 24, 39);
+            pdf.text(`${value}%`, barX + barWidth / 2, barY - 2, { align: "center" });
+          });
+
+          pdf.setFontSize(7);
+          pdf.setTextColor(156, 163, 175);
+          pdf.text(day.day || "-", groupX + groupWidth / 2, chartBottom + 4, { align: "center" });
+        });
+
+        // Legend
+        let legendX = chartX;
+        const legendY = chartBottom + 14;
+        series.forEach((serie, index) => {
+          const dotX = legendX + 1;
+          pdf.setFillColor(...serie.color);
+          pdf.circle(dotX, legendY - 1.5, 2.5, "F");
+          pdf.setFontSize(8);
+          pdf.setTextColor(17, 24, 39);
+          pdf.text(serie.label, dotX + 6, legendY, { align: "left" });
+          legendX += 40;
+        });
+
+        y += chartHeight + 22;
+      } else {
+        pdf.setFontSize(11);
+        pdf.setTextColor(110, 110, 110);
+        pdf.text("No sufficient data for chart", margin, y);
+        y += 18;
       }
 
-      pdf.save('weekly-emotion-report.pdf');
+      if (y > pageHeight - 90) {
+        pdf.addPage();
+        y = 20;
+      }
+
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Weekly Mood Trend", margin, y);
+      y += 8;
+
+      if (hasChartData) {
+        const trendHeight = 70;
+        const trendX = margin;
+        const trendY = y;
+        const trendLeft = trendX + 24;
+        const trendRight = pageWidth - margin;
+        const trendBottom = trendY + trendHeight - 14;
+        const trendInnerWidth = trendRight - trendLeft;
+        const trendInnerHeight = trendHeight - 24;
+
+        pdf.setDrawColor(220);
+        pdf.rect(trendX, trendY, usableWidth, trendHeight);
+
+        pdf.setFontSize(7);
+        pdf.setTextColor(107, 114, 128);
+        [100, 50, 0].forEach((value, index) => {
+          const labelY = trendY + 10 + (trendInnerHeight / 2) * index;
+          pdf.text(`${value}%`, trendLeft - 6, labelY + 2, { align: "right" });
+          pdf.line(trendLeft, labelY, trendRight, labelY, "S");
+        });
+
+        const series = [
+          { key: "averageConfidence", color: [34, 197, 94], label: "Confidence" },
+          { key: "positiveMoodScore", color: [59, 130, 246], label: "Positive Mood" },
+          { key: "negativeMoodScore", color: [239, 68, 68], label: "Negative Mood" },
+        ];
+
+        const xStep = days.length > 1 ? trendInnerWidth / (days.length - 1) : 0;
+        const pointSets = series.map((serie) => {
+          return days.map((day, index) => {
+            const value = Math.max(0, Math.min(100, day[serie.key] || 0));
+            return {
+              x: trendLeft + index * xStep,
+              y: trendBottom - (value / 100) * trendInnerHeight,
+              value,
+            };
+          });
+        });
+
+        series.forEach((serie, serieIndex) => {
+          const points = pointSets[serieIndex];
+          pdf.setDrawColor(...serie.color);
+          pdf.setLineWidth(1.5);
+          points.forEach((point, index) => {
+            if (index > 0) {
+              const previous = points[index - 1];
+              pdf.line(previous.x, previous.y, point.x, point.y);
+            }
+          });
+          points.forEach((point) => {
+            pdf.setFillColor(...serie.color);
+            pdf.circle(point.x, point.y, 1.8, "F");
+          });
+        });
+
+        days.forEach((day, index) => {
+          const labelX = trendLeft + index * xStep;
+          pdf.setFontSize(7);
+          pdf.setTextColor(156, 163, 175);
+          pdf.text(day.day || "-", labelX, trendBottom + 10, { align: "center" });
+        });
+
+        let legendX = trendX;
+        const legendY = trendBottom + 18;
+        series.forEach((serie) => {
+          const dotX = legendX + 1;
+          pdf.setFillColor(...serie.color);
+          pdf.circle(dotX, legendY - 1.5, 2.5, "F");
+          pdf.setFontSize(8);
+          pdf.setTextColor(17, 24, 39);
+          pdf.text(serie.label, dotX + 6, legendY, { align: "left" });
+          legendX += 45;
+        });
+
+        y += trendHeight + 22;
+      } else {
+        pdf.setFontSize(11);
+        pdf.setTextColor(110, 110, 110);
+        pdf.text("No sufficient data for chart", margin, y);
+        y += 18;
+      }
+
+      if (y > pageHeight - 90) {
+        pdf.addPage();
+        y = 20;
+      }
+
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Insights", margin, y);
+      y += 10;
+
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "normal");
+      weeklyData.insights.forEach((insight) => {
+        if (y > pageHeight - 40) {
+          pdf.addPage();
+          y = 20;
+        }
+        pdf.text(`• ${insight}`, margin, y, { maxWidth: usableWidth });
+        y += 7;
+      });
+
+      y += 10;
+      if (y > pageHeight - 90) {
+        pdf.addPage();
+        y = 20;
+      }
+
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Tomorrow's Prediction", margin, y);
+      y += 8;
+
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`Mood: ${prediction.mood || "Neutral"}`, margin, y);
+      y += 6;
+      pdf.text(`Confidence: ${prediction.confidence || 0}%`, margin, y);
+      y += 6;
+      pdf.text(`Reason: ${prediction.reason || "Based on your weekly emotion report."}`, margin, y, {
+        maxWidth: usableWidth,
+      });
+
+      y += 12;
+      if (y > pageHeight - 30) {
+        pdf.addPage();
+        y = 20;
+      }
+
+      pdf.setFontSize(10);
+      pdf.setTextColor(110, 110, 110);
+      pdf.text("Generated by Emotion AI", margin, pageHeight - 12);
+
+      pdf.save("weekly-emotion-report.pdf");
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      console.error("Error generating PDF:", error);
     }
+
     setIsGeneratingPDF(false);
   };
 
@@ -83,7 +353,7 @@ const WeeklyReports = () => {
   }
 
   return (
-    <div className="weekly-reports-container" ref={reportRef}>
+    <div className="weekly-reports-container">
       {/* Header */}
       <motion.div
         className="reports-header"

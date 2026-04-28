@@ -1,18 +1,34 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, X } from "lucide-react";
-import axios from "axios";
+import {
+  getNotifications,
+  getUnreadCount,
+  markNotificationRead,
+  markAllNotificationsRead,
+  clearNotifications,
+  ensureDailyReminder,
+} from "../utils/notificationStorage";
 import "./NotificationBell.css";
 
 const NotificationBell = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Fetch notifications on mount
+  const username = localStorage.getItem("loggedUser") || "guest";
+
+  const loadNotifications = () => {
+    const list = getNotifications(username);
+    setNotifications(list);
+    setUnreadCount(getUnreadCount(username));
+  };
+
   useEffect(() => {
-    fetchNotifications();
+    loadNotifications();
+    ensureDailyReminder(username);
   }, []);
 
   // Close dropdown when clicking outside
@@ -23,34 +39,47 @@ const NotificationBell = () => {
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const fetchNotifications = async () => {
-    try {
-      const username = localStorage.getItem("loggedUser");
-      const response = await axios.get(`http://127.0.0.1:8000/api/notifications/?username=${username}`);
+  useEffect(() => {
+    const handleUpdate = () => loadNotifications();
 
-      if (response.data && response.data.notifications) {
-        setNotifications(response.data.notifications);
-        setUnreadCount(response.data.unread_count || 0);
-      }
-    } catch (error) {
-      console.log("Error fetching notifications:", error);
-      // Fallback to empty notifications
-      setNotifications([]);
-      setUnreadCount(0);
-    }
-  };
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("notification-update", handleUpdate);
+
+    return () => {
+      window.removeEventListener("storage", handleUpdate);
+      window.removeEventListener("notification-update", handleUpdate);
+    };
+  }, []);
 
   const toggleDropdown = () => {
-    setIsOpen(!isOpen);
-    if (!isOpen) {
-      // Mark as read when opening
-      setUnreadCount(0);
-    }
+    setIsOpen((current) => !current);
   };
+
+  const handleMarkAsRead = (id) => {
+    const updated = markNotificationRead(id, username);
+    setNotifications(updated);
+    setUnreadCount(updated.filter((notification) => !notification.read).length);
+  };
+
+  const handleMarkAllAsRead = () => {
+    const updated = markAllNotificationsRead(username);
+    setNotifications(updated);
+    setUnreadCount(0);
+  };
+
+  const handleClearAll = () => {
+    clearNotifications(username);
+    setNotifications([]);
+    setUnreadCount(0);
+  };
+
+  const visibleNotifications = showUnreadOnly
+    ? notifications.filter((notification) => !notification.read)
+    : notifications;
 
   const getNotificationIcon = (type) => {
     switch (type) {
@@ -117,35 +146,55 @@ const NotificationBell = () => {
           >
             {/* Header */}
             <div className="notification-header">
-              <h4>Notifications</h4>
-              <button
-                className="close-btn"
-                onClick={() => setIsOpen(false)}
-              >
-                <X size={16} />
-              </button>
+              <div>
+                <h4>Notifications</h4>
+                <span className="notification-subtitle">{unreadCount} unread</span>
+              </div>
+              <div className="notification-header-actions">
+                <button
+                  className="notification-filter-btn"
+                  onClick={() => setShowUnreadOnly((prev) => !prev)}
+                >
+                  {showUnreadOnly ? "Show all" : "Unread only"}
+                </button>
+                <button
+                  className="close-btn"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
             {/* Notifications List */}
             <div className="notification-list">
-              {notifications.length > 0 ? (
-                notifications.map((notification, index) => (
+              {visibleNotifications.length > 0 ? (
+                visibleNotifications.map((notification, index) => (
                   <motion.div
                     key={notification.id || index}
-                    className={`notification-item ${notification.type}`}
+                    className={`notification-item ${notification.type} ${notification.read ? "read" : "unread"}`}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
                   >
                     <div className="notification-icon">
-                      {getNotificationIcon(notification.type)}
+                      {notification.icon || getNotificationIcon(notification.type)}
                     </div>
                     <div className="notification-content">
+                      <p className="notification-title">{notification.title}</p>
                       <p className="notification-message">{notification.message}</p>
                       <span className="notification-time">
                         {formatTimeAgo(notification.created_at)}
                       </span>
                     </div>
+                    {!notification.read && (
+                      <button
+                        className="notification-action-btn"
+                        onClick={() => handleMarkAsRead(notification.id)}
+                      >
+                        Mark as Read
+                      </button>
+                    )}
                   </motion.div>
                 ))
               ) : (
@@ -162,9 +211,15 @@ const NotificationBell = () => {
               <div className="notification-footer">
                 <button
                   className="mark-read-btn"
-                  onClick={() => setUnreadCount(0)}
+                  onClick={handleMarkAllAsRead}
                 >
                   Mark all as read
+                </button>
+                <button
+                  className="mark-clear-btn"
+                  onClick={handleClearAll}
+                >
+                  Clear All
                 </button>
               </div>
             )}

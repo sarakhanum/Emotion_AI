@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { CheckCircle, Clock, Target, Heart, Brain, Zap, Coffee, Book, Music, Users } from "lucide-react";
 import { getLatestEmotion, incrementTasksCompleted } from "../utils/emotionStorage";
+import { createNotification } from "../utils/notificationStorage";
 import "./TasksSuggestions.css";
 
 const TasksSuggestions = () => {
@@ -455,6 +456,15 @@ const TasksSuggestions = () => {
             completedIds.add(taskId);
             localStorage.setItem(getTaskStorageKey(), JSON.stringify([...completedIds]));
             incrementTasksCompleted();
+            createNotification(
+              {
+                title: "Task completed",
+                message: `You've completed a task from your ${currentMood} mood suggestions.`,
+                type: "task",
+                icon: "✅",
+              },
+              localStorage.getItem("loggedUser") || "guest"
+            );
           }
         } catch {
           // Fail silently if storage is unavailable

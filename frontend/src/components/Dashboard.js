@@ -10,7 +10,9 @@ import {
   getEmotionDistribution,
   getDistributionPercentages,
   getAverageConfidence,
+  getLatestEmotion,
 } from "../utils/emotionStorage";
+import { createNotification } from "../utils/notificationStorage";
 import "./Dashboard.css";
 
 function Dashboard() {
@@ -153,6 +155,7 @@ function Dashboard() {
         // ============================================
         // SAVE TO EMOTION STORAGE WITH DEDUPLICATION
         // ============================================
+        const previousEmotion = getLatestEmotion();
         const saved = saveEmotionData({
           emotion: emotion,
           confidence: confidence,
@@ -165,6 +168,32 @@ function Dashboard() {
         // Only refresh stats if new data was saved (not a duplicate)
         if (saved) {
           fetchTodayStats();
+
+          createNotification(
+            {
+              title: "New emotion detected",
+              message: `Detected ${emotion} with ${Math.round(confidence)}% confidence.`,
+              type: "info",
+              icon: "🔍",
+            },
+            localStorage.getItem("loggedUser") || "guest"
+          );
+
+          if (
+            previousEmotion &&
+            previousEmotion.dominantEmotion !== emotion &&
+            Math.abs((confidence || 0) - (previousEmotion.confidence || 0)) >= 10
+          ) {
+            createNotification(
+              {
+                title: "Mood changed significantly",
+                message: `Your mood shifted from ${previousEmotion.dominantEmotion} to ${emotion}.`,
+                type: "warning",
+                icon: "⚡",
+              },
+              localStorage.getItem("loggedUser") || "guest"
+            );
+          }
         }
 
         // Drawing code for visualization
